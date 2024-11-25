@@ -1,0 +1,6 @@
+﻿  Hilda.cpp
+C:\dev\Hilda\Hilda\Hilda\Shader.h(3,10): warning C4067: 预处理器指令后有意外标记 - 应输入换行符
+C:\dev\Hilda\Hilda\Hilda\func.h(182,22): warning C4244: “初始化”: 从“double”转换到“float”，可能丢失数据
+C:\dev\Hilda\Hilda\Hilda\func.h(197,41): warning C4244: “=”: 从“double”转换到“float”，可能丢失数据
+C:\dev\Hilda\Hilda\Hilda\func.h(201,40): warning C4244: “+=”: 从“double”转换到“float”，可能丢失数据
+  Hilda.vcxproj -> C:\dev\Hilda\Hilda\x64\Debug\Hilda.exe
