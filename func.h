@@ -1,26 +1,65 @@
 #pragma once
-#include "camera.h"
+#define M_PI 3.14159265358979323846
+#include <cmath> 
+#include <vector>
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 #include "Model.h"
+#include "camera.h"
 
 //渲染循环
-float deltaTime = 0.0f; // 当前帧与上一帧的时间差
-float lastFrame = 0.0f; // 上一帧的时间
-//实例化相机，并设置其初始位置
-Camera camera(glm::vec3(0.0f, 13.5f, 10.0f));
-//灯位置
-glm::vec3 lightPos(2.5f, 12.0f, 2.5f);
+inline float deltaTime = 0.0f; // 当前帧与上一帧的时间差
+inline float lastFrame = 0.0f; // 上一帧的时间
 //鼠标移动
-bool firstMouse = true;
-float lastX = m_width / 2.0;
-float lastY = m_height / 2.0;
+inline bool firstMouse = true;
+inline float lastX = m_width / 2.0;
+inline float lastY = m_height / 2.0;
 //暂停
-bool isPause = false;//是否暂停，默认没有
-bool lastKeyState = false;//是否按下，默认没有
-float pauseTime = 0.0f;
-float pauseStartTime = 0.0f;
+inline bool isPause = false; //是否暂停，默认没有
+inline bool spaceLast = false; //是否按下，默认没有
+inline float pauseTime = 0.0f;
+inline float pauseStartTime = 0.0f;
+//视角光
+inline bool spotLight = true;//默认视角光开
+inline bool spotlightLast = false;//是否按下，默认没有
+//alt隐藏光标
+inline bool mousehide = true; //默认光标隐藏
+//开关
+inline bool Furina = true;//默认黑Furina
+inline bool lockLight = false;//默认没有锁定灯
+inline bool grass = true;//默认有草
+inline bool windowPNG = true;//默认有窗户
+inline bool plane = true;//默认有地板
+//后期处理
+inline bool issharpen = false;
+inline bool isedge = false;
+inline bool isemboss = false;
+inline bool isembossInvert = false;
+inline bool issolarize = false;
+inline bool isblur = false;
+//灯位置
+inline glm::vec3 lightSpeed(1.0f, 1.5f, 1.0f);
+inline glm::vec3 lightPos(1.0f);
+//球位置
+inline glm::vec3 ballSpeed(0.25f, 0.0f, 0.25f);
+inline glm::vec3 ballPos(1.0f);
+//球折射率
+inline const char* materials[] = {//imgui规定必须const char*
+    "Glass", "Vacuum", "Air", "Water", "Ice", "Alcohol", "Quartz", "Acrylic", "Diamond", "Sapphire"
+};
+inline float IOR[] = {
+    1.52f, 1.0f, 1.0003f, 1.333f, 1.31f, 1.36f, 1.46f, 1.49f, 2.42f, 1.77f
+};
+inline int curMaterial = 5; //默认为玻璃
+inline float ratio = 1.0f / IOR[curMaterial];
+//实例化相机，并设置其初始位置
+inline Camera camera(glm::vec3(0.0f, 15.0f, 25.0f));
+//地板高度
+inline float planeHeight = 5.0f;
+
 
 //窗口初始化和基础设置
-GLFWwindow* Init()
+inline GLFWwindow* Init()
 {
     //初始化 实例化窗口
     glfwInit();
@@ -39,10 +78,29 @@ GLFWwindow* Init()
 
     //把“工作空间”绑定到指定窗口，即把窗口的上下文设置为当前线程的主上下文
     glfwMakeContextCurrent(window);
+    //隐藏光标
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     //每当窗口调整大小时调用回调函数
     glfwSetFramebufferSizeCallback(window,[](GLFWwindow* window, int width, int height) {
         glViewport(0, 0, width, height);
+        });
+
+    glfwSetKeyCallback(window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
+        {
+            if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS) {
+                if (mousehide) {
+                    // 按下 ALT 键时，显示光标                 
+                    mousehide = false;
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                    glfwSetCursorPos(window, m_width / 2.0, m_height / 2.0);
+                }
+                else {
+                    // 按下 ALT 键时，隐藏光标
+                    mousehide = true;
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                }
+            }
         });
 
     //每当鼠标滚轮时调用回调函数
@@ -69,11 +127,9 @@ GLFWwindow* Init()
         lastX = xpos;
         lastY = ypos;
 
-        camera.ProcessMouseMovement(xoffset, yoffset);
+        if (mousehide)
+            camera.ProcessMouseMovement(xoffset, yoffset);
         });
-
-    //隐藏光标
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     //初始化GLAD GLAD是用来管理OpenGL的函数指针的
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -83,13 +139,12 @@ GLFWwindow* Init()
     }
 
     stbi_set_flip_vertically_on_load(false);//翻转纹理
-    glEnable(GL_DEPTH_TEST);//开启深度测试，Z-Buffer实现
-
+    
     return window;
 }
 
 //检查是否按下了ESC
-void processInput(GLFWwindow* window)
+inline void processInput(GLFWwindow* window)
 {
     //计算间隔时间
     float currentFrame = static_cast<float>(glfwGetTime());
@@ -99,7 +154,7 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
     //调整相机
-    float cameraSpeed = 2.5f * deltaTime;
+    float cameraSpeed = 4.5f * deltaTime;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         camera.ProcessKeyboard(FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -111,7 +166,7 @@ void processInput(GLFWwindow* window)
 }
 
 //加载纹理
-unsigned int loadTexture(char const* path)
+inline unsigned int loadTexture(char const* path)
 {
     //创建对象
     unsigned int textureID;
@@ -134,8 +189,8 @@ unsigned int loadTexture(char const* path)
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data); //第一个0是Mipmap级别
         glGenerateMipmap(GL_TEXTURE_2D);//Mipmap
         //为当前绑定的纹理对象设置环绕、过滤方式
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT); 
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         //释放
@@ -148,9 +203,41 @@ unsigned int loadTexture(char const* path)
     }
     return textureID;
 }
+//加载纹理，天空盒
+inline unsigned int loadCubemap(std::vector<std::string> faces)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < faces.size(); i++)
+    {
+        unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        if (data)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
+            );
+            stbi_image_free(data);
+        }
+        else
+        {
+            std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
+            stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return textureID;
+}
 
 //查错，来自chatgpt
-void error()
+inline void error()
 {
     GLenum err;
     while ((err = glGetError()) != GL_NO_ERROR) {
@@ -176,38 +263,7 @@ void error()
     }
 }
 
-//灯随时间变化
-void lampchange(GLFWwindow* window)
-{
-    float adjustTime = glfwGetTime() - pauseTime;//弥补暂停带来的时间偏移         
-    if (!isPause) {
-        //括号里面是速度，外面是半径
-        glm::vec3 vec = glm::vec3(1.0f);
-        vec.x = 3.5f * cos(adjustTime * 1.0f);
-        vec.y = 12.5f + 4.0f * sin(adjustTime * 1.5f) / 2.0f;
-        vec.z = 3.5f * sin(adjustTime * 1.0f);
-        lightPos = vec;
-    }
-    //按下且与上一帧状态不同才会启动
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !lastKeyState) {
-        isPause = !isPause;
-        lastKeyState = true; // 更新状态为按下
-        if (isPause) {
-            // 开始暂停，记录当前的时间
-            pauseStartTime = glfwGetTime();
-        }
-        else {
-            // 结束暂停，计算暂停的时间
-            pauseTime += glfwGetTime() - pauseStartTime;
-        }
-    }
-    //直到松开按键，更新按键状态
-    else if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
-        lastKeyState = false;
-    }
-}
-
-float vertices[] = {
+inline float cubeVertices[] = {
     //位置
     -0.5f, -0.5f, -0.5f,
      0.5f, -0.5f, -0.5f,
@@ -251,3 +307,182 @@ float vertices[] = {
     -0.5f,  0.5f,  0.5f,
     -0.5f,  0.5f, -0.5f
 };
+
+inline float planeVertices[] = {
+    // positions          // texture Coords 
+     5.0f, -0.5f,  5.0f,  2.0f, 0.0f,
+    -5.0f, -0.5f,  5.0f,  0.0f, 0.0f,
+    -5.0f, -0.5f, -5.0f,  0.0f, 2.0f,
+
+     5.0f, -0.5f,  5.0f,  2.0f, 0.0f,
+    -5.0f, -0.5f, -5.0f,  0.0f, 2.0f,
+     5.0f, -0.5f, -5.0f,  2.0f, 2.0f
+};
+
+inline float gwVertices[] = {//gw即grass和window
+    // positions         // texture Coords (swapped y coordinates because texture is flipped upside down)
+    0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
+    0.0f, -0.5f,  0.0f,  0.0f,  1.0f,
+    1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
+
+    0.0f,  0.5f,  0.0f,  0.0f,  0.0f,
+    1.0f, -0.5f,  0.0f,  1.0f,  1.0f,
+    1.0f,  0.5f,  0.0f,  1.0f,  0.0f
+};
+
+inline std::vector<glm::vec3> gw
+{
+    glm::vec3(-1.5f, 0.0f, -0.48f),
+    glm::vec3(1.5f, 0.0f, 0.51f),
+    glm::vec3(0.0f, 0.0f, 0.7f),
+    glm::vec3(-0.3f, 0.0f, -2.3f),
+    glm::vec3(0.5f, 0.0f, -0.6f)
+};
+
+inline float quadVertices[] = { // vertex attributes for a quad that fills the entire screen in Normalized Device Coordinates.
+    // positions   // texCoords
+    -1.0f,  1.0f,  0.0f, 1.0f,
+    -1.0f, -1.0f,  0.0f, 0.0f,
+     1.0f, -1.0f,  1.0f, 0.0f,
+
+    -1.0f,  1.0f,  0.0f, 1.0f,
+     1.0f, -1.0f,  1.0f, 0.0f,
+     1.0f,  1.0f,  1.0f, 1.0f
+};
+
+//正常
+inline float kernel[9] = {
+    0, 0, 0,
+    0, 1, 0,
+    0, 0, 0
+};
+//锐化
+inline float sharpen[9] = {
+    -1, -1, -1,
+    -1,  9, -1,
+    -1, -1, -1
+};
+//边缘检测
+inline float edge[9] = {
+    1, 1, 1,
+    1,-8, 1,
+    1, 1, 1
+};
+//浮雕
+inline float emboss[9] = {
+    -2,-1, 0,
+    -1, 1, 1,
+     0, 1, 2
+};
+//反转浮雕
+inline float embossInvert[9] = {
+     2,  1,  0,
+     1, -1, -1,
+     0, -1, -2
+};
+//太阳化
+inline float solarize[9] = {
+    0, 1, 0,
+    1, -4, 1,
+    0, 1, 0
+};
+//高斯模糊
+inline float blur[9] = {
+    1.0 / 16.0, 2.0 / 16.0, 1.0 / 16.0,
+    2.0 / 16.0, 4.0 / 16.0, 2.0 / 16.0,
+    1.0 / 16.0, 2.0 / 16.0, 1.0 / 16.0
+};
+
+//天空盒
+inline std::vector<std::string> faces
+{
+    "res/Texture/containers/skybox/right.jpg",
+    "res/Texture/containers/skybox/left.jpg",
+    "res/Texture/containers/skybox/top.jpg",
+    "res/Texture/containers/skybox/bottom.jpg",
+    "res/Texture/containers/skybox/front.jpg",
+    "res/Texture/containers/skybox/back.jpg"
+};
+inline float skyboxVertices[] = {
+    // positions          
+    -1.0f,  1.0f, -1.0f,
+    -1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+
+    -1.0f, -1.0f,  1.0f,
+    -1.0f, -1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f, -1.0f,
+    -1.0f,  1.0f,  1.0f,
+    -1.0f, -1.0f,  1.0f,
+
+     1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+
+    -1.0f, -1.0f,  1.0f,
+    -1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f,
+    -1.0f, -1.0f,  1.0f,
+
+    -1.0f,  1.0f, -1.0f,
+     1.0f,  1.0f, -1.0f,
+     1.0f,  1.0f,  1.0f,
+     1.0f,  1.0f,  1.0f,
+    -1.0f,  1.0f,  1.0f,
+    -1.0f,  1.0f, -1.0f,
+
+    -1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f, -1.0f,
+     1.0f, -1.0f, -1.0f,
+    -1.0f, -1.0f,  1.0f,
+     1.0f, -1.0f,  1.0f
+};
+
+//生成球
+inline std::vector<float> generateBall() {
+    std::vector<float> ballVertices;
+    unsigned int stackCount = 18;
+    unsigned int sectorCount = 36;
+    float radius = 1.0f;
+    for (unsigned int i = 0; i < stackCount; ++i) {
+        for (unsigned int j = 0; j < sectorCount; ++j) {
+            // 获取四个顶点（当前层和下一层）
+            auto getVertex = [&](int stack, int sector) {
+                float theta = M_PI * stack / stackCount;
+                float phi = 2 * M_PI * sector / sectorCount;
+                float x = sin(theta) * cos(phi);
+                float y = cos(theta);
+                float z = sin(theta) * sin(phi);
+                return glm::vec3(x, y, z) * radius;
+                };
+
+            glm::vec3 v1 = getVertex(i, j);
+            glm::vec3 v2 = getVertex(i + 1, j);
+            glm::vec3 v3 = getVertex(i, j + 1);
+            glm::vec3 v4 = getVertex(i + 1, j + 1);
+
+            // 添加两个三角形（v1-v2-v3 和 v2-v4-v3）
+            for (const auto& v : { v1, v2, v3, v2, v4, v3 }) {
+                 ballVertices.push_back(v.x);
+                 ballVertices.push_back(v.y);
+                 ballVertices.push_back(v.z);
+
+                 glm::vec3 normal = glm::normalize(v);
+                 ballVertices.push_back(normal.x);
+                 ballVertices.push_back(normal.y);
+                 ballVertices.push_back(normal.z);
+            }
+        }
+    }
+    return ballVertices;
+}

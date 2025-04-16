@@ -14,23 +14,24 @@ enum Camera_Movement
 
 //默认参数
 //默认参数必须在编译时确定，所以放在class外面
+const float SPEED = 10.0f;
 const float YAW = -90.0f;
 const float PITCH = 0.0f;
-const float SPEED = 10.0f;
 const float SENSITIVITY = 0.05f;
 const float ZOOM = 45.0f;
-const unsigned int m_width = 800, m_height = 600;
+const unsigned int m_width = 1200, m_height = 900;
 
 class Camera
 {
+public:
+    glm::vec3 Position;
+    float MovementSpeed;
 private:
     //相机设置
-    glm::vec3 Position;
     glm::vec3 Front;
     glm::vec3 Up;
     glm::vec3 Right;
     glm::vec3 WorldUp;
-    float MovementSpeed;
     float MouseSensitivity;
     float Zoom;
     //欧拉角
